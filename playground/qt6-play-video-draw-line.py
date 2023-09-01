@@ -2,10 +2,11 @@ import sys
 import cv2
 from PyQt6.QtCore import Qt, QUrl, QTimer
 from PyQt6.QtGui import QMovie
-from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QSizePolicy, QVBoxLayout, QWidget, QFileDialog, QMenuBar, QStatusBar, QToolBar, QSlider, QHBoxLayout, QPushButton
+from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QFileDialog, QMenuBar, QStatusBar, QToolBar, QSlider, QGraphicsScene, QGraphicsView, QGraphicsLineItem, QGraphicsEffect, QGraphicsOpacityEffect
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QIcon, QPalette, QPen, QColor
+
 
 class VideoPlayer(QMainWindow):
     def __init__(self):
@@ -22,6 +23,19 @@ class VideoPlayer(QMainWindow):
 
         # Set the media player to use the QVideoWidget as its output
         self.media_player.setVideoOutput(self.video_widget)
+
+        # Create a QGraphicsScene to hold the line item
+        self.scene = QGraphicsScene(self)
+
+        # Create a QGraphicsLineItem to draw the line
+        self.line_item = QGraphicsLineItem()
+        self.line_item.setPen(QPen(QColor(255, 0, 0), 5))
+        self.scene.addItem(self.line_item)
+
+        # Create a QGraphicsOpacityEffect to draw the line on the video
+        self.effect = QGraphicsOpacityEffect(self.video_widget)
+        self.effect.setOpacity(1.0)
+        self.video_widget.setGraphicsEffect(self.effect)
 
         # Create a QMenuBar
         menu_bar = QMenuBar(self)
@@ -73,6 +87,19 @@ class VideoPlayer(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_progress_bar)
 
+        # Create a pen for the line item
+        self.pen = QPen()
+        self.pen.setColor(QColor(255, 0, 0))
+        self.pen.setWidth(2)
+
+        # Create a flag to indicate whether the user is drawing a line
+        self.drawing_line = False
+
+        # Connect the mouse events to the video widget
+        self.video_widget.mousePressEvent = self.mouse_press_event
+        self.video_widget.mouseMoveEvent = self.mouse_move_event
+        self.video_widget.mouseReleaseEvent = self.mouse_release_event
+
     def open_file(self):
         # Open a file dialog to select a video file
         file_name, _ = QFileDialog.getOpenFileName(self, "Open Video", "", "Video Files (*.mp4 *.mov)")
@@ -87,17 +114,6 @@ class VideoPlayer(QMainWindow):
 
             # Start the timer to update the progress bar
             self.timer.start(1000)
-
-            # Not sure why, but MP4 file can detect portrait correctly, but MOV file cannot.
-            # # Get the size of the video
-            # video_size = self.video_widget.size()
-
-            # # If the video is taller than it is wide, adjust the size of the video widget
-            # if video_size.height() > video_size.width():
-            #     self.video_widget.setFixedSize(video_size.height(), video_size.width())
-            # else:
-            #     self.video_widget.setFixedSize(video_size.width(), video_size.height())
-
 
     def play(self):
         # Start playing the video
@@ -120,6 +136,28 @@ class VideoPlayer(QMainWindow):
         # Update the progress bar to reflect the current position of the video
         position = self.media_player.position()
         self.progress_bar.setValue(position)
+
+    # FIXME: there is even but I cannot see the line shown on video
+    def mouse_press_event(self, event):
+        print('mouse_press_event')
+        # Create a new line item at the position of the mouse click
+        self.line_item = QGraphicsLineItem(event.pos().x(), event.pos().y(), event.pos().x(), event.pos().y())
+        self.line_item.setPen(self.pen)
+        self.scene.addItem(self.line_item)
+
+        # Set the flag to indicate that the user is drawing a line
+        self.drawing_line = True
+
+    def mouse_move_event(self, event):
+        print('mouse_move_event')
+        if self.drawing_line:
+            # Update the end point of the line item to the position of the mouse move
+            self.line_item.setLine(self.line_item.line().x1(), self.line_item.line().y1(), event.pos().x(), event.pos().y())
+
+    def mouse_release_event(self, event):
+        print('mouse_release_event')
+        # Set the flag to indicate that the user is no longer drawing a line
+        self.drawing_line = False
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
